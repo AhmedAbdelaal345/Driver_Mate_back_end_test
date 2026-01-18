@@ -7,22 +7,31 @@ const app = express();
 app.use(cors());
 
 const upload = multer();
-
-// Secret key for JWT
 const SECRET = "DRIVER_MATE_SECRET_KEY";
 
-// In-memory storage
 let users = [];
-let otps = {}; // { email: "123456" }
+let otps = {};
 
-// ======================
+// =====================
+// HOME ROUTE
+// =====================
+app.get("/", (req, res) => {
+  res.send("Driver Mate Auth API (FormData + JWT + OTP) is running...");
+});
+
+// =====================
 // REGISTER
-// ======================
+// =====================
 app.post("/register", upload.none(), (req, res) => {
+  console.log("REGISTER BODY:", req.body);
+
   const { name, email, password, isAgreed } = req.body;
 
   if (!name || !email || !password) {
-    return res.status(400).json({ status: false, message: "Missing fields" });
+    return res.status(400).json({
+      status: false,
+      message: "Missing fields"
+    });
   }
 
   users.push({ name, email, password, isAgreed });
@@ -30,18 +39,20 @@ app.post("/register", upload.none(), (req, res) => {
   res.json({
     status: true,
     message: "User registered successfully",
-    data: { name, email }
+    data: { name, email, isAgreed }
   });
 });
 
-// ======================
+// =====================
 // LOGIN + TOKEN
-// ======================
+// =====================
 app.post("/login", upload.none(), (req, res) => {
+  console.log("LOGIN BODY:", req.body);
+
   const { email, password } = req.body;
 
   const user = users.find(
-    (u) => u.email === email && u.password === password
+    u => u.email === email && u.password === password
   );
 
   if (!user) {
@@ -60,16 +71,15 @@ app.post("/login", upload.none(), (req, res) => {
   });
 });
 
-// ======================
+// =====================
 // REQUEST OTP
-// ======================
+// =====================
 app.post("/request-otp", upload.none(), (req, res) => {
   const { email } = req.body;
 
-  const user = users.find((u) => u.email === email);
-  if (!user) {
+  const user = users.find(u => u.email === email);
+  if (!user)
     return res.status(404).json({ status: false, message: "Email not found" });
-  }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -78,13 +88,13 @@ app.post("/request-otp", upload.none(), (req, res) => {
   res.json({
     status: true,
     message: "OTP generated",
-    otp // انت هتستقبلها في الفلتر (لأن مفيش SMS حاليا)
+    otp
   });
 });
 
-// ======================
+// =====================
 // VERIFY OTP
-// ======================
+// =====================
 app.post("/verify-otp", upload.none(), (req, res) => {
   const { email, otp } = req.body;
 
@@ -103,22 +113,45 @@ app.post("/verify-otp", upload.none(), (req, res) => {
   });
 });
 
-// ======================
-// CHANGE PASSWORD
-// ======================
-app.post("/change-password", upload.none(), (req, res) => {
-  const { email, oldPassword, newPassword } = req.body;
+// =====================
+// AUTH MIDDLEWARE
+// =====================
+function auth(req, res, next) {
+  const header = req.headers.authorization;
 
-  const user = users.find(
-    (u) => u.email === email && u.password === oldPassword
-  );
+  if (!header)
+    return res
+      .status(401)
+      .json({ status: false, message: "No token provided" });
 
-  if (!user) {
-    return res.status(401).json({
-      status: false,
-      message: "Old password is wrong"
-    });
+  const token = header.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ status: false, message: "Invalid token" });
   }
+}
+
+// =====================
+// CHANGE PASSWORD
+// =====================
+app.post("/change-password", upload.none(), auth, (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+
+  const email = req.user.email;
+
+  const user = users.find(u => u.email === email);
+
+  if (!user)
+    return res.status(404).json({ status: false, message: "User not found" });
+
+  if (user.password !== oldPassword)
+    return res
+      .status(400)
+      .json({ status: false, message: "Old password is incorrect" });
 
   user.password = newPassword;
 
@@ -128,8 +161,8 @@ app.post("/change-password", upload.none(), (req, res) => {
   });
 });
 
-// ======================
-// RAILWAY PORT
-// ======================
+// =====================
+// RAILWAY PORT FIX
+// =====================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running on port " + PORT));
+app.listen(PORT, () => console.log("SERVER STARTED ON PORT", PORT));

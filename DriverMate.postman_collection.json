@@ -1,0 +1,49 @@
+{
+    "info": {
+      "name": "Driver Mate Auth API",
+      "_postman_id": "dri-mate-12345",
+      "description": "Register & Login API for Driver Mate Flutter App",
+      "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+      {
+        "name": "Register",
+        "request": {
+          "method": "POST",
+          "header": [
+            { "key": "Content-Type", "value": "application/json" }
+          ],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"name\": \"Ahmed\",\n  \"email\": \"Ahmed@gmail.com\",\n  \"password\": \"123456\",\n  \"isAgreed\": true\n}"
+          },
+          "url": {
+            "raw": "https://drivermatebackendtest-production.up.railway.app/register",
+            "protocol": "https",
+            "host": ["drivermatebackendtest-production", "up", "railway", "app"],
+            "path": ["register"]
+          }
+        }
+      },
+      {
+        "name": "Login",
+        "request": {
+          "method": "POST",
+          "header": [
+            { "key": "Content-Type", "value": "application/json" }
+          ],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"email\": \"Ahmed@gmail.com\",\n  \"password\": \"123456\"\n}"
+          },
+          "url": {
+            "raw": "https://drivermatebackendtest-production.up.railway.app/login",
+            "protocol": "https",
+            "host": ["drivermatebackendtest-production", "up", "railway", "app"],
+            "path": ["login"]
+          }
+        }
+      }
+    ]
+  }
+  

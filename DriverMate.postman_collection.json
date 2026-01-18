@@ -1,46 +1,154 @@
 {
     "info": {
       "name": "Driver Mate Auth API",
-      "_postman_id": "dri-mate-12345",
-      "description": "Register & Login API for Driver Mate Flutter App",
+      "_postman_id": "drivermate-auth-collection-456",
+      "description": "Driver Mate Auth API with FormData, JWT, OTP, Change Password",
       "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "item": [
       {
-        "name": "Register",
+        "name": "Register (FormData)",
         "request": {
           "method": "POST",
-          "header": [
-            { "key": "Content-Type", "value": "application/json" }
-          ],
+          "header": [],
           "body": {
-            "mode": "raw",
-            "raw": "{\n  \"name\": \"Ahmed\",\n  \"email\": \"Ahmed@gmail.com\",\n  \"password\": \"123456\",\n  \"isAgreed\": true\n}"
+            "mode": "formdata",
+            "formdata": [
+              { "key": "name", "value": "Ahmed", "type": "text" },
+              { "key": "email", "value": "ahmed@gmail.com", "type": "text" },
+              { "key": "password", "value": "123456", "type": "text" },
+              { "key": "isAgreed", "value": "true", "type": "text" }
+            ]
           },
           "url": {
             "raw": "https://drivermatebackendtest-production.up.railway.app/register",
             "protocol": "https",
-            "host": ["drivermatebackendtest-production", "up", "railway", "app"],
+            "host": [
+              "drivermatebackendtest-production",
+              "up",
+              "railway",
+              "app"
+            ],
             "path": ["register"]
           }
         }
       },
       {
-        "name": "Login",
+        "name": "Login (FormData + Save Token)",
         "request": {
           "method": "POST",
-          "header": [
-            { "key": "Content-Type", "value": "application/json" }
-          ],
+          "header": [],
           "body": {
-            "mode": "raw",
-            "raw": "{\n  \"email\": \"Ahmed@gmail.com\",\n  \"password\": \"123456\"\n}"
+            "mode": "formdata",
+            "formdata": [
+              { "key": "email", "value": "ahmed@gmail.com", "type": "text" },
+              { "key": "password", "value": "123456", "type": "text" }
+            ]
           },
           "url": {
             "raw": "https://drivermatebackendtest-production.up.railway.app/login",
             "protocol": "https",
-            "host": ["drivermatebackendtest-production", "up", "railway", "app"],
+            "host": [
+              "drivermatebackendtest-production",
+              "up",
+              "railway",
+              "app"
+            ],
             "path": ["login"]
+          }
+        },
+        "response": [],
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "exec": [
+                "let json = pm.response.json();",
+                "if (json.token) {",
+                "    pm.environment.set('token', json.token);",
+                "}",
+                "console.log('TOKEN SAVED:', pm.environment.get('token'));"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "name": "Request OTP",
+        "request": {
+          "method": "POST",
+          "body": {
+            "mode": "formdata",
+            "formdata": [
+              { "key": "email", "value": "ahmed@gmail.com", "type": "text" }
+            ]
+          },
+          "url": {
+            "raw": "https://drivermatebackendtest-production.up.railway.app/request-otp",
+            "protocol": "https",
+            "host": [
+              "drivermatebackendtest-production",
+              "up",
+              "railway",
+              "app"
+            ],
+            "path": ["request-otp"]
+          }
+        }
+      },
+      {
+        "name": "Verify OTP",
+        "request": {
+          "method": "POST",
+          "body": {
+            "mode": "formdata",
+            "formdata": [
+              { "key": "email", "value": "ahmed@gmail.com", "type": "text" },
+              { "key": "otp", "value": "123456", "type": "text" }
+            ]
+          },
+          "url": {
+            "raw": "https://drivermatebackendtest-production.up.railway.app/verify-otp",
+            "protocol": "https",
+            "host": [
+              "drivermatebackendtest-production",
+              "up",
+              "railway",
+              "app"
+            ],
+            "path": ["verify-otp"]
+          }
+        }
+      },
+      {
+        "name": "Change Password (Protected)",
+        "request": {
+          "method": "POST",
+          "header": [
+            {
+              "key": "Authorization",
+              "value": "Bearer {{token}}",
+              "type": "text"
+            }
+          ],
+          "body": {
+            "mode": "formdata",
+            "formdata": [
+              { "key": "email", "value": "ahmed@gmail.com", "type": "text" },
+              { "key": "oldPassword", "value": "123456", "type": "text" },
+              { "key": "newPassword", "value": "789123", "type": "text" }
+            ]
+          },
+          "url": {
+            "raw": "https://drivermatebackendtest-production.up.railway.app/change-password",
+            "protocol": "https",
+            "host": [
+              "drivermatebackendtest-production",
+              "up",
+              "railway",
+              "app"
+            ],
+            "path": ["change-password"]
           }
         }
       }

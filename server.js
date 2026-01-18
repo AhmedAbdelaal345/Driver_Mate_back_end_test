@@ -1,4 +1,5 @@
 const express = require("express");
+require("dotenv").config();
 const cors = require("cors");
 const multer = require("multer");
 const jwt = require("jsonwebtoken");
@@ -480,6 +481,14 @@ app.use((req, res) => {
 // =====================
 // START SERVER
 // =====================
+process.on("uncaughtException", (err) => {
+  console.error("💥 Uncaught Exception:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("💥 Unhandled Rejection:", err);
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Driver Mate Auth API running on port ${PORT}`);

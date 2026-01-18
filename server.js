@@ -8,7 +8,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const upload = multer();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fieldSize: 5 * 1024 * 1024 // 5MB for safety
+  }
+});
 const SECRET = process.env.JWT_SECRET || "DRIVER_MATE_SECRET_KEY";
 const SALT_ROUNDS = 10;
 

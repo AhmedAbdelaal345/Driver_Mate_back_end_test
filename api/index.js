@@ -246,16 +246,16 @@ app.post("/request-otp", upload.none(), async (req, res) => {
     const resend = new Resend(process.env.RESEND_API_KEY);
 
     await resend.emails.send({
-      from: "Driver Mate <onboarding@resend.dev>",
+      from: "Driver Mate <onboarding@resend.dev>",   // FIXED
       to: email,
       subject: "Your OTP Code",
       html: `
-        <h1>Your OTP Code</h1>
-        <p>Here is your verification code:</p>
+        <h1>Your DriverMate OTP</h1>
         <h2>${otp}</h2>
-        <p>This code expires in 10 minutes.</p>
+        <p>Expires in 10 minutes.</p>
       `
     });
+    
 
     res.json({
       status: true,

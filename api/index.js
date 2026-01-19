@@ -4,20 +4,16 @@ const cors = require("cors");
 const multer = require("multer");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const { Resend } = require("resend");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 // ==========================
-//  SECRETS
+//  JWT SECRETS
 // ==========================
 const ACCESS_SECRET = process.env.ACCESS_SECRET || "DRIVER_MATE_ACCESS";
 const REFRESH_SECRET = process.env.REFRESH_SECRET || "DRIVER_MATE_REFRESH";
-const RESEND_API_KEY = process.env.RESEND_API_KEY || "re_eD9AAvas_5PFurHBZ4jdWJTF3y4gf9RSY";
-
-const resend = new Resend(RESEND_API_KEY);
 
 const SALT_ROUNDS = 10;
 
@@ -27,11 +23,14 @@ const upload = multer({
 });
 
 // ==========================
-// TEMP MEMORY DATABASE
+//  In-memory storage (for testing)
 // ==========================
 let users = [];
 let otps = {}; // { email: { code, expiresAt } }
 
+// ==========================
+// Helpers
+// ==========================
 const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const validatePassword = (password) => password && password.length >= 6;
 
@@ -41,8 +40,17 @@ const validatePassword = (password) => password && password.length >= 6;
 app.get("/", (req, res) => {
   res.json({
     status: true,
-    message: "Driver Mate Auth API (Serverless Ready)",
-    version: "2.0.0"
+    message: "Driver Mate Auth API (Vercel Serverless)",
+    endpoints: {
+      register: "POST /api/register",
+      login: "POST /api/login",
+      refreshToken: "POST /api/refresh-token",
+      requestOtp: "POST /api/request-otp",
+      verifyOtp: "POST /api/verify-otp",
+      changePassword: "POST /api/change-password",
+      resetPassword: "POST /api/reset-password",
+      profile: "GET /api/profile"
+    }
   });
 });
 
@@ -66,7 +74,7 @@ app.post("/register", upload.none(), async (req, res) => {
       return res.status(400).json({ status: false, message: "Must accept terms" });
 
     if (users.find(u => u.email === email))
-      return res.status(409).json({ status: false, message: "Email already registered" });
+      return res.status(409).json({ status: false, message: "Email already exists" });
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
@@ -80,9 +88,13 @@ app.post("/register", upload.none(), async (req, res) => {
 
     users.push(newUser);
 
-    res.status(201).json({ status: true, message: "Registered successfully", data: newUser });
+    res.status(201).json({
+      status: true,
+      message: "Registered successfully",
+      data: newUser
+    });
 
-  } catch (err) {
+  } catch {
     res.status(500).json({ status: false, message: "Registration failed" });
   }
 });
@@ -118,13 +130,17 @@ app.post("/login", upload.none(), async (req, res) => {
 
     res.json({
       status: true,
-      message: "Login successful",
+      message: "Login success",
       accessToken,
       refreshToken,
-      user: { id: user.id, name: user.name, email: user.email }
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email
+      }
     });
 
-  } catch (err) {
+  } catch {
     res.status(500).json({ status: false, message: "Login failed" });
   }
 });
@@ -132,20 +148,20 @@ app.post("/login", upload.none(), async (req, res) => {
 // ==========================
 // REFRESH TOKEN
 // ==========================
-app.post("/refresh-token", upload.none(), async (req, res) => {
+app.post("/refresh-token", upload.none(), (req, res) => {
   try {
     const { refreshToken } = req.body;
 
     if (!refreshToken)
-      return res.status(400).json({ status: false, message: "Refresh token required" });
+      return res.status(400).json({ status: false, message: "Refresh token is required" });
 
     const user = users.find(u => u.refreshToken === refreshToken);
     if (!user)
       return res.status(403).json({ status: false, message: "Invalid refresh token" });
 
-    jwt.verify(refreshToken, REFRESH_SECRET, (err) => {
+    jwt.verify(refreshToken, REFRESH_SECRET, (err, decoded) => {
       if (err)
-        return res.status(403).json({ status: false, message: "Expired refresh token" });
+        return res.status(403).json({ status: false, message: "Expired or invalid refresh token" });
 
       const newAccessToken = jwt.sign(
         { id: user.id, email: user.email },
@@ -153,11 +169,14 @@ app.post("/refresh-token", upload.none(), async (req, res) => {
         { expiresIn: "15m" }
       );
 
-      res.json({ status: true, accessToken: newAccessToken });
+      res.json({
+        status: true,
+        accessToken: newAccessToken
+      });
     });
 
-  } catch (err) {
-    res.status(500).json({ status: false, message: "Could not refresh token" });
+  } catch {
+    res.status(500).json({ status: false, message: "Failed to refresh token" });
   }
 });
 
@@ -167,13 +186,13 @@ app.post("/refresh-token", upload.none(), async (req, res) => {
 function auth(req, res, next) {
   const header = req.headers.authorization;
   if (!header)
-    return res.status(401).json({ status: false, message: "Token required" });
+    return res.status(401).json({ status: false, message: "No token" });
 
   const token = header.split(" ")[1];
 
   jwt.verify(token, ACCESS_SECRET, (err, decoded) => {
     if (err)
-      return res.status(401).json({ status: false, message: "Invalid token" });
+      return res.status(401).json({ status: false, message: "Invalid/expired token" });
 
     req.user = decoded;
     next();
@@ -181,7 +200,26 @@ function auth(req, res, next) {
 }
 
 // ==========================
-// REQUEST OTP (SEND EMAIL)
+// PROFILE
+// ==========================
+app.get("/profile", auth, (req, res) => {
+  const user = users.find(u => u.email === req.user.email);
+  if (!user)
+    return res.status(404).json({ status: false, message: "User not found" });
+
+  res.json({
+    status: true,
+    data: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt
+    }
+  });
+});
+
+// ==========================
+// REQUEST OTP
 // ==========================
 app.post("/request-otp", upload.none(), async (req, res) => {
   try {
@@ -201,26 +239,32 @@ app.post("/request-otp", upload.none(), async (req, res) => {
       expiresAt: Date.now() + 10 * 60 * 1000
     };
 
-    console.log("OTP:", otp);
+    console.log(`OTP for ${email}: ${otp}`);
 
-    // SEND EMAIL
+    // ===== SEND EMAIL USING RESEND =====
+    const { Resend } = require("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
     await resend.emails.send({
-      from: "Driver Mate <noreply@drivermate.app>",
+      from: "Driver Mate <onboarding@resend.dev>",
       to: email,
       subject: "Your OTP Code",
       html: `
-        <h1>Your DriverMate OTP</h1>
-        <p>Your verification code is:</p>
+        <h1>Your OTP Code</h1>
+        <p>Here is your verification code:</p>
         <h2>${otp}</h2>
         <p>This code expires in 10 minutes.</p>
       `
     });
 
-    res.json({ status: true, message: "OTP sent to email" });
+    res.json({
+      status: true,
+      message: "OTP sent to email"
+    });
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ status: false, message: "Failed to send OTP" });
+  } catch (error) {
+    console.log("OTP EMAIL ERROR", error);
+    res.status(500).json({ status: false, message: "OTP request failed" });
   }
 });
 
@@ -230,6 +274,9 @@ app.post("/request-otp", upload.none(), async (req, res) => {
 app.post("/verify-otp", upload.none(), (req, res) => {
   try {
     const { email, otp } = req.body;
+
+    if (!email || !otp)
+      return res.status(400).json({ status: false, message: "Missing data" });
 
     const data = otps[email];
     if (!data)
@@ -245,8 +292,8 @@ app.post("/verify-otp", upload.none(), (req, res) => {
 
     res.json({ status: true, message: "OTP verified" });
 
-  } catch (err) {
-    res.status(500).json({ status: false, message: "Verification failed" });
+  } catch {
+    res.status(500).json({ status: false, message: "OTP verification failed" });
   }
 });
 
@@ -257,18 +304,24 @@ app.post("/change-password", upload.none(), auth, async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
 
+    if (!oldPassword || !newPassword)
+      return res.status(400).json({ status: false, message: "Missing fields" });
+
+    if (!validatePassword(newPassword))
+      return res.status(400).json({ status: false, message: "Weak password" });
+
     const user = users.find(u => u.email === req.user.email);
 
     const valid = await bcrypt.compare(oldPassword, user.password);
     if (!valid)
-      return res.status(400).json({ status: false, message: "Wrong old password" });
+      return res.status(400).json({ status: false, message: "Old password incorrect" });
 
     user.password = await bcrypt.hash(newPassword, SALT_ROUNDS);
 
     res.json({ status: true, message: "Password updated" });
 
-  } catch (err) {
-    res.status(500).json({ status: false, message: "Password update failed" });
+  } catch {
+    res.status(500).json({ status: false, message: "Failed to change password" });
   }
 });
 
@@ -279,18 +332,23 @@ app.post("/reset-password", upload.none(), async (req, res) => {
   try {
     const { email, newPassword } = req.body;
 
+    if (!email || !validatePassword(newPassword))
+      return res.status(400).json({ status: false, message: "Invalid data" });
+
     const user = users.find(u => u.email === email);
     if (!user)
       return res.status(404).json({ status: false, message: "User not found" });
 
     user.password = await bcrypt.hash(newPassword, SALT_ROUNDS);
 
-    res.json({ status: true, message: "Password reset successful" });
+    res.json({ status: true, message: "Password reset" });
 
-  } catch (err) {
-    res.status(500).json({ status: false, message: "Password reset failed" });
+  } catch {
+    res.status(500).json({ status: false, message: "Failed to reset password" });
   }
 });
 
+// ==========================
+// EXPORT FOR VERCEL
 // ==========================
 module.exports = app;
